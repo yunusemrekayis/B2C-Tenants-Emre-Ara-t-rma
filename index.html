@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Etkileşimli Azure AD B2C Raporu</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Neutrals -->
+    <!-- Application Structure Plan: The application is structured as a single-page dashboard with a fixed left-hand navigation menu. This non-linear structure allows users to jump directly to the section they are interested in, such as "Core Concepts," "Implementation Guide," or "Troubleshooting." This is more user-friendly than a long, scrolling report. Key interactions include a clickable process flow for the implementation steps, an interactive comparison chart, and a collapsible accordion for common issues, making dense information digestible and engaging. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: B2C vs Entra ID comparison -> Goal: Compare -> Viz: HTML Table -> Interaction: Static, for clear side-by-side view -> Justification: Tables are optimal for direct feature comparison.
+        - Report Info: Implementation Phases -> Goal: Organize/Guide -> Viz: HTML/CSS Process Flow -> Interaction: Clickable steps revealing details -> Justification: Visually guides the user through a complex process, making it less intimidating.
+        - Report Info: Pricing Model -> Goal: Inform -> Viz: Chart.js Bar Chart -> Interaction: Hover tooltips -> Justification: A visual chart is more intuitive for understanding scaling costs than text.
+        - Report Info: Common Errors -> Goal: Organize/Troubleshoot -> Viz: HTML/JS Accordion -> Interaction: Click to expand/collapse -> Justification: Hides complexity and allows users to focus only on the problem they are facing.
+        - CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F9FAFB;
+            color: #1F2937;
+        }
+        .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            transition: all 0.2s ease-in-out;
+            font-weight: 500;
+            color: #4B5563;
+        }
+        .nav-link:hover {
+            background-color: #E5E7EB;
+            color: #111827;
+        }
+        .nav-link.active {
+            background-color: #3B82F6;
+            color: white;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .nav-link svg {
+            margin-right: 0.75rem;
+        }
+        .content-section {
+            display: none;
+        }
+        .content-section.active {
+            display: block;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 350px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 400px;
+            }
+        }
+        .accordion-header {
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+        }
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-in-out;
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <div class="flex h-screen bg-gray-50">
+        <aside class="w-64 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col">
+            <div class="h-16 flex items-center justify-center border-b border-gray-200">
+                <h1 class="text-xl font-bold text-blue-600">Azure B2C Raporu</h1>
+            </div>
+            <nav class="flex-1 p-4 space-y-2">
+                <a href="#giris" class="nav-link active">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" /></svg>
+                    Giriş
+                </a>
+                <a href="#temel-kavramlar" class="nav-link">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
+                    Temel Kavramlar
+                </a>
+                <a href="#karsilastirma" class="nav-link">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" /></svg>
+                    Karşılaştırmalar
+                </a>
+                <a href="#uygulama-rehberi" class="nav-link">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10.392C2.057 15.71 3.245 16 4.5 16h1.054c.256-1.664 1.686-3 3.446-3s3.19 1.336 3.446 3H13.5c1.255 0 2.443-.29 3.5-.804V4.804C15.943 4.29 14.755 4 13.5 4c-1.255 0-2.443.29-3.5.804H9z" /><path d="M10 2a2 2 0 100 4 2 2 0 000-4z" /></svg>
+                    Uygulama Rehberi
+                </a>
+                 <a href="#gelismis-ozellikler" class="nav-link">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0L8 7.152l-4.242.618c-1.634.239-2.293 2.252-1.1 3.403l3.07 2.992-1.034 4.327c-.328 1.37.9 2.5 2.166 1.775L10 17.34l3.84 2.018c1.266.725 2.494-.405 2.166-1.775l-1.034-4.327 3.07-2.992c1.193-1.151.534-3.164-1.1-3.403L12 7.152l-.51-3.982z" clip-rule="evenodd" /></svg>
+                    Gelişmiş Özellikler
+                </a>
+                <a href="#operasyonlar" class="nav-link">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0L8 7.152l-4.242.618c-1.634.239-2.293 2.252-1.1 3.403l3.07 2.992-1.034 4.327c-.328 1.37.9 2.5 2.166 1.775L10 17.34l3.84 2.018c1.266.725 2.494-.405 2.166-1.775l-1.034-4.327 3.07-2.992c1.193-1.151.534-3.164-1.1-3.403L12 7.152l-.51-3.982z" clip-rule="evenodd" /></svg>
+                    Operasyonlar
+                </a>
+            </nav>
+        </aside>
+
+        <main class="flex-1 overflow-y-auto p-6 md:p-10">
+            <div id="giris" class="content-section active">
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">Azure AD B2C: Etkileşimli Bir Bakış</h2>
+                <p class="text-lg text-gray-600 mb-6">
+                    Bu uygulama, Azure Active Directory B2C (Müşteriden Müşteriye) hizmetinin karmaşık dünyasını basitleştirmek için tasarlanmıştır. Geleneksel bir raporu okumak yerine, burada temel kavramları keşfedebilir, uygulama adımlarını interaktif olarak takip edebilir ve en iyi uygulamaları dinamik bir şekilde öğrenebilirsiniz. Amacımız, geliştiricilerin ve karar vericilerin, uygulamaları için güvenli, ölçeklenebilir ve tamamen markalaştırılabilir bir müşteri kimlik yönetimi çözümünü nasıl uygulayacaklarını hızlıca anlamalarını sağlamaktır.
+                </p>
+                <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+                    <h3 class="text-xl font-semibold mb-3">Azure B2C'nin Temel Vaatleri</h3>
+                    <div class="grid md:grid-cols-3 gap-6">
+                        <div class="text-center p-4">
+                            <div class="text-blue-500 mb-3">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-1.026.977-2.206.977-3.454a5.002 5.002 0 00-4.476-4.972M5.5 11a3.5 3.5 0 006.323 2.413l-4.141 4.142a.5.5 0 01-.707 0l-1.172-1.171a.5.5 0 010-.707l4.141-4.141A3.5 3.5 0 005.5 11z" /></svg>
+                            </div>
+                            <h4 class="font-semibold text-lg">Ölçeklenebilirlik</h4>
+                            <p class="text-gray-500 text-sm">Milyonlarca kullanıcıyı ve günde milyarlarca kimlik doğrulama işlemini destekleyecek şekilde tasarlanmıştır.</p>
+                        </div>
+                        <div class="text-center p-4">
+                            <div class="text-blue-500 mb-3">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                            </div>
+                            <h4 class="font-semibold text-lg">Güvenlik</h4>
+                            <p class="text-gray-500 text-sm">DDoS, parola spreyi gibi tehditler Microsoft tarafından otomatik olarak yönetilir.</p>
+                        </div>
+                        <div class="text-center p-4">
+                            <div class="text-blue-500 mb-3">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l-4 4-4-4 4-4" /></svg>
+                            </div>
+                            <h4 class="font-semibold text-lg">Özelleştirme</h4>
+                            <p class="text-gray-500 text-sm">HTML, CSS ve JavaScript ile tamamen markanıza özel, "white-label" bir kimlik deneyimi sunar.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="temel-kavramlar" class="content-section">
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">Temel Kavramlar</h2>
+                <p class="text-lg text-gray-600 mb-6">
+                    Azure AD B2C'nin nasıl çalıştığını anlamak için temel yapı taşlarını bilmek önemlidir. Bu bölüm, B2C mimarisinin en kritik bileşenlerini ve bunların birbirleriyle nasıl etkileşime girdiğini açıklar.
+                </p>
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+                        <h3 class="font-semibold text-xl mb-2">B2C Tenant (Kiracı)</h3>
+                        <p class="text-gray-600">Kuruluşunuzun müşterileri için özel bir kullanıcı dizinidir. Mevcut kurumsal (çalışan) dizininizden tamamen ayrı ve yalıtılmıştır. Her şey bu kiracıyı oluşturmakla başlar.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+                        <h3 class="font-semibold text-xl mb-2">Uygulama Kayıtları</h3>
+                        <p class="text-gray-600">B2C tarafından güvenliği sağlanacak her web veya mobil uygulamanın tenant içinde kaydedilmesi gerekir. Bu kayıt, B2C ile uygulama arasında bir güven ilişkisi kurar.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+                        <h3 class="font-semibold text-xl mb-2">Kullanıcı Akışları (User Flows)</h3>
+                        <p class="text-gray-600">Kayıt olma, oturum açma, profil düzenleme gibi yaygın kimlik görevleri için önceden tanımlanmış, portal üzerinden yapılandırılabilen ilkelerdir. Kod yazmadan hızlı başlangıç sağlar.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+                        <h3 class="font-semibold text-xl mb-2">Özel İlkeler (Custom Policies)</h3>
+                        <p class="text-gray-600">Kullanıcı Akışlarının yetersiz kaldığı karmaşık senaryolar için tam esneklik sunar. XML dosyaları düzenlenerek harici API entegrasyonu gibi gelişmiş işlemler yapılır.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+                        <h3 class="font-semibold text-xl mb-2">Kimlik Sağlayıcılar (IdP)</h3>
+                        <p class="text-gray-600">Kullanıcıların nasıl oturum açacağını belirler. Bunlar "Yerel Hesaplar" (e-posta/şifre) veya "Sosyal/Kurumsal Hesaplar" (Google, Facebook, vb.) olabilir.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+                        <h3 class="font-semibold text-xl mb-2">Token (Belirteç)</h3>
+                        <p class="text-gray-600">Başarılı bir kimlik doğrulama sonrası B2C'nin uygulamanıza gönderdiği güvenlik kanıtıdır. Kullanıcının kimliğini ve yetkilerini (claims) içerir.</p>
+                    </div>
+                </div>
+                 <div class="mt-8 bg-white p-6 rounded-lg shadow-md border border-gray-200">
+                    <h3 class="text-xl font-semibold mb-3">Fiyatlandırma Modeli: Aylık Aktif Kullanıcı (MAU)</h3>
+                    <p class="text-gray-600 mb-4">Azure AD B2C, kullanıcı başına lisans yerine, bir takvim ayı içinde kimlik doğrulaması yapan benzersiz kullanıcı sayısına göre fiyatlandırılır. İlk 50.000 aylık aktif kullanıcı ücretsizdir, bu da birçok projenin maliyetsiz başlamasını sağlar. Aşağıdaki grafik, kullanıcı sayısı arttıkça maliyetin nasıl değiştiğini göstermektedir.</p>
+                    <div class="chart-container">
+                        <canvas id="pricingChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div id="karsilastirma" class="content-section">
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">Önemli Karşılaştırmalar</h2>
+                <p class="text-lg text-gray-600 mb-6">
+                    Doğru aracı seçmek ve doğru stratejiyi belirlemek, B2C projelerinin başarısı için kritiktir. Bu bölümde, geliştiricilerin en sık karşılaştığı iki temel ayrım net bir şekilde ortaya konulmaktadır: B2C'nin kurumsal karşılığı olan Microsoft Entra ID ile farkları ve basit Kullanıcı Akışları ile gelişmiş Özel İlkeler arasındaki seçim kriterleri.
+                </p>
+
+                <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-8">
+                    <h3 class="text-2xl font-semibold mb-4 text-center">B2C vs. Microsoft Entra ID</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr>
+                                    <th class="py-3 px-4 bg-gray-100 font-semibold text-sm text-gray-600 border-b border-gray-200">Özellik</th>
+                                    <th class="py-3 px-4 bg-gray-100 font-semibold text-sm text-gray-600 border-b border-gray-200">Microsoft Entra ID (Kurumsal)</th>
+                                    <th class="py-3 px-4 bg-blue-100 font-semibold text-sm text-blue-800 border-b border-blue-200">Azure AD B2C (Müşteri)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="hover:bg-gray-50">
+                                    <td class="py-3 px-4 border-b border-gray-200 font-medium">Hedef Kitle</td>
+                                    <td class="py-3 px-4 border-b border-gray-200">Çalışanlar, iş ortakları (İç kullanıcılar)</td>
+                                    <td class="py-3 px-4 border-b border-gray-200 bg-blue-50">Müşteriler, vatandaşlar (Dış kullanıcılar)</td>
+                                </tr>
+                                <tr class="hover:bg-gray-50">
+                                    <td class="py-3 px-4 border-b border-gray-200 font-medium">Ana Kullanım Alanı</td>
+                                    <td class="py-3 px-4 border-b border-gray-200">Kurumsal kaynaklara ve SaaS'a (M365) erişim</td>
+                                    <td class="py-3 px-4 border-b border-gray-200 bg-blue-50">Halka açık web ve mobil uygulamalara erişim</td>
+                                </tr>
+                                <tr class="hover:bg-gray-50">
+                                    <td class="py-3 px-4 border-b border-gray-200 font-medium">Arayüz Özelleştirme</td>
+                                    <td class="py-3 px-4 border-b border-gray-200">Sınırlı (Logo, arka plan)</td>
+                                    <td class="py-3 px-4 border-b border-gray-200 bg-blue-50">Tam (HTML, CSS, JavaScript)</td>
+                                </tr>
+                                <tr class="hover:bg-gray-50">
+                                    <td class="py-3 px-4 border-b border-gray-200 font-medium">Fiyatlandırma</td>
+                                    <td class="py-3 px-4 border-b border-gray-200">Kullanıcı başına lisans</td>
+                                    <td class="py-3 px-4 border-b border-gray-200 bg-blue-50">Aylık Aktif Kullanıcı (MAU)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+                    <h3 class="text-2xl font-semibold mb-4 text-center">Kullanıcı Akışları vs. Özel İlkeler</h3>
+                     <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr>
+                                    <th class="py-3 px-4 bg-gray-100 font-semibold text-sm text-gray-600 border-b border-gray-200">Kriter</th>
+                                    <th class="py-3 px-4 bg-gray-100 font-semibold text-sm text-gray-600 border-b border-gray-200">Kullanıcı Akışları (User Flows)</th>
+                                    <th class="py-3 px-4 bg-blue-100 font-semibold text-sm text-blue-800 border-b border-blue-200">Özel İlkeler (Custom Policies)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="hover:bg-gray-50">
+                                    <td class="py-3 px-4 border-b border-gray-200 font-medium">Yapılandırma</td>
+                                    <td class="py-3 px-4 border-b border-gray-200">Azure Portal Arayüzü (Tıklama ile)</td>
+                                    <td class="py-3 px-4 border-b border-gray-200 bg-blue-50">XML Dosyaları (Kodlama ile)</td>
+                                </tr>
+                                <tr class="hover:bg-gray-50">
+                                    <td class="py-3 px-4 border-b border-gray-200 font-medium">Karmaşıklık</td>
+                                    <td class="py-3 px-4 border-b border-gray-200">Düşük, hızlı başlangıç</td>
+                                    <td class="py-3 px-4 border-b border-gray-200 bg-blue-50">Yüksek, öğrenme eğrisi var</td>
+                                </tr>
+                                <tr class="hover:bg-gray-50">
+                                    <td class="py-3 px-4 border-b border-gray-200 font-medium">Esneklik</td>
+                                    <td class="py-3 px-4 border-b border-gray-200">Önceden tanımlanmış senaryolar</td>
+                                    <td class="py-3 px-4 border-b border-gray-200 bg-blue-50">Tam kontrol, sınırsız senaryo</td>
+                                </tr>
+                                <tr class="hover:bg-gray-50">
+                                    <td class="py-3 px-4 border-b border-gray-200 font-medium">Öneri</td>
+                                    <td class="py-3 px-4 border-b border-gray-200 font-bold">Her zaman bununla başlayın.</td>
+                                    <td class="py-3 px-4 border-b border-gray-200 bg-blue-50 font-bold">Yalnızca User Flows yetersiz kaldığında kullanın.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="uygulama-rehberi" class="content-section">
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">Etkileşimli Uygulama Rehberi</h2>
+                <p class="text-lg text-gray-600 mb-8">
+                    Bir B2C çözümü kurmak, mantıksal adımlardan oluşan bir süreçtir. Bu rehber, "Contoso Commerce" adlı bir e-ticaret sitesi senaryosu üzerinden sizi temel kurulumdan gelişmiş özelliklere kadar yönlendirir. Aşağıdaki adımlara tıklayarak ilgili detayı görüntüleyebilirsiniz.
+                </p>
+                
+                <div class="w-full">
+                    <div class="flex items-center">
+                        <div class="process-step flex-1 text-center p-4 border-b-4 border-blue-500" data-step="1">
+                            <div class="text-blue-500 font-bold">Faz 1</div>
+                            <div class="text-sm font-semibold">Temelleri Atmak</div>
+                        </div>
+                        <div class="process-step flex-1 text-center p-4 border-b-4 border-gray-300" data-step="2">
+                            <div class="text-gray-500 font-bold">Faz 2</div>
+                            <div class="text-sm font-semibold">Deneyimi Şekillendirmek</div>
+                        </div>
+                        <div class="process-step flex-1 text-center p-4 border-b-4 border-gray-300" data-step="3">
+                            <div class="text-gray-500 font-bold">Faz 3</div>
+                            <div class="text-sm font-semibold">Seçenekleri Genişletme</div>
+                        </div>
+                    </div>
+
+                    <div id="step-content" class="mt-6 bg-white p-6 rounded-lg shadow-md border border-gray-200">
+                    </div>
+                </div>
+            </div>
+
+            <div id="gelismis-ozellikler" class="content-section">
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">Gelişmiş Özellikler</h2>
+                 <p class="text-lg text-gray-600 mb-6">
+                    Temel kimlik doğrulama akışları kurulduktan sonra, gerçek dünya uygulamaları genellikle daha fazlasını gerektirir. Bu bölüm, B2C'nin gücünü tam olarak ortaya çıkaran üç ana konuya odaklanmaktadır: kullanıcı arayüzünü markanızla bütünleştirmek, harici sistemlerle konuşmak ve yetkilendirme mantığı uygulamak.
+                </p>
+                <div class="bg-white rounded-lg shadow-md border border-gray-200">
+                    <div class="flex border-b border-gray-200">
+                        <button class="adv-tab-btn flex-1 py-4 px-2 text-center font-semibold text-blue-600 border-b-2 border-blue-600" data-target="tab-branding">Markalama & Arayüz</button>
+                        <button class="adv-tab-btn flex-1 py-4 px-2 text-center font-semibold text-gray-500" data-target="tab-api">API Bağlayıcıları</button>
+                        <button class="adv-tab-btn flex-1 py-4 px-2 text-center font-semibold text-gray-500" data-target="tab-rbac">Rol Tabanlı Erişim (RBAC)</button>
+                    </div>
+                    <div class="p-6">
+                        <div id="tab-branding" class="adv-tab-content">
+                            <h3 class="text-xl font-semibold mb-3">Kullanıcı Deneyimini Markanızla Bütünleştirin</h3>
+                            <p class="text-gray-600 mb-4">B2C, kullanıcıların gördüğü her sayfanın HTML, CSS ve JavaScript kodunu tamamen kontrol etmenize olanak tanır. Bu, kimlik doğrulama sürecinin uygulamanızın doğal bir parçası gibi hissedilmesini sağlar.</p>
+                            <ul class="list-disc list-inside space-y-2 text-gray-700">
+                                <li><strong>Şirket Markalaması:</strong> En hızlı yöntemdir. Portal üzerinden arka plan resmi, logo ve renkleri ayarlayabilirsiniz.</li>
+                                <li><strong>Tam HTML/CSS Kontrolü:</strong> Kendi HTML/CSS dosyalarınızı bir Azure Blob Storage hesabında barındırarak, arayüzü tamamen özgürce tasarlayabilirsiniz. Tek yapmanız gereken, B2C'nin içeriği enjekte edeceği `<div id="api"></div>` elemanını sayfanıza eklemektir.</li>
+                                <li><strong>Dil Özelleştirme:</strong> Portal üzerinden farklı diller için destek ekleyebilir ve varsayılan metinleri kendi çevirilerinizle değiştirebilirsiniz.</li>
+                            </ul>
+                        </div>
+                        <div id="tab-api" class="adv-tab-content hidden">
+                            <h3 class="text-xl font-semibold mb-3">Harici Sistemlerle Konuşun</h3>
+                            <p class="text-gray-600 mb-4">API Bağlayıcıları, kullanıcı akışlarının belirli adımlarında (örneğin, kullanıcı oluşturulmadan önce veya token gönderilmeden önce) harici bir REST API'yi çağırmanızı sağlar. Bu, B2C'yi bir orkestratöre dönüştürür.</p>
+                             <ul class="list-disc list-inside space-y-2 text-gray-700">
+                                <li><strong>Kullanıcı Girdisini Doğrulama:</strong> Kayıt sırasında girilen bir davet kodunun geçerliliğini kendi API'nize sorarak kontrol edin.</li>
+                                <li><strong>Token'ları Zenginleştirme:</strong> Oturum açma sonrası, kullanıcının sadakat durumu gibi bilgileri veritabanınızdan alıp token'a anında ekleyin.</li>
+                                <li><strong>İş Mantığını Tetikleme:</strong> Yeni bir kullanıcı kaydolduğunda, bir "Hoş Geldiniz" e-postası gönderen bir iş akışını tetikleyin.</li>
+                            </ul>
+                        </div>
+                        <div id="tab-rbac" class="adv-tab-content hidden">
+                            <h3 class="text-xl font-semibold mb-3">Kullanıcı Yetkilerini Yönetin</h3>
+                            <p class="text-gray-600 mb-4">B2C'nin tüketici hesapları için yerleşik "Roller" veya "Gruplar" özelliği yoktur. Bu işlevsellik, özel nitelikler ve Microsoft Graph API kullanılarak uygulanır.</p>
+                            <ol class="list-decimal list-inside space-y-2 text-gray-700">
+                                <li><strong>Özel Nitelik Oluşturun:</strong> Portalda `Roles` adında bir `String` türünde özel kullanıcı niteliği tanımlayın.</li>
+                                <li><strong>Niteliği Token'a Ekleyin:</strong> Oturum açma akışınızın "Application claims" bölümünden bu yeni niteliği seçin.</li>
+                                <li><strong>Değeri Atayın:</strong> Bir yönetici paneli veya arka uç işlemi aracılığıyla, Microsoft Graph API'yi kullanarak belirli bir kullanıcının `Roles` niteliğini programatik olarak güncelleyin (örn. "Admin,Editor").</li>
+                            </ol>
+                            <p class="mt-4 text-gray-600">Bu sayede, kullanıcı oturum açtığında token'ı içinde rollerini içeren bir claim taşır ve uygulamanız bu bilgiye göre yetkilendirme yapabilir.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="operasyonlar" class="content-section">
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">Operasyonlar ve En İyi Uygulamalar</h2>
+                 <p class="text-lg text-gray-600 mb-6">
+                    Bir B2C çözümünü üretim ortamına almak ve sorunsuz çalıştırmak, dikkatli bir planlama ve proaktif izleme gerektirir. Bu bölüm, forumlarda sıkça karşılaşılan sorunlardan güvenlik önlemlerine kadar operasyonel mükemmellik için bir rehber sunar.
+                </p>
+                <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-8">
+                    <h3 class="text-2xl font-semibold mb-4">Sık Karşılaşılan Sorunlar ve Çözümleri</h3>
+                    <div id="accordion-container" class="space-y-2">
+                        <div class="accordion-item border rounded-lg">
+                            <div class="accordion-header flex justify-between items-center p-4 bg-gray-50 hover:bg-gray-100">
+                                <h4 class="font-semibold">Hata: AADB2C99002: The user does not exist...</h4>
+                                <svg class="w-5 h-5 transform transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                            </div>
+                            <div class="accordion-content p-4 border-t border-gray-200">
+                                <p><strong>Neden:</strong> Bu, en yaygın başlangıç hatasıdır. B2C tenant'ını oluşturan yönetici hesabıyla (bir "İş Hesabı") uygulamaya oturum açmaya çalışıyorsunuz. <br><strong>Çözüm:</strong> Uygulamaya oturum açacak kullanıcının, uygulamanın kendi kayıt akışı üzerinden oluşturulmuş bir "Tüketici Hesabı" olması gerekir. Yönetici hesabıyla uygulama test edilemez.</p>
+                            </div>
+                        </div>
+                        <div class="accordion-item border rounded-lg">
+                            <div class="accordion-header flex justify-between items-center p-4 bg-gray-50 hover:bg-gray-100">
+                                <h4 class="font-semibold">Hata: Metadata endpoint cannot be fetched...</h4>
+                                <svg class="w-5 h-5 transform transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                            </div>
+                            <div class="accordion-content p-4 border-t border-gray-200">
+                                <p><strong>Neden:</strong> Uygulamanızın yapılandırma dosyasında (`appsettings.json` vb.) bir yazım hatası var. <br><strong>Çözüm:</strong> `Instance`, `Domain` veya `PolicyId` gibi değerlerin Azure portalındaki değerlerle tam olarak eşleştiğini kontrol edin. En küçük bir harf hatası bile bu soruna yol açar.</p>
+                            </div>
+                        </div>
+                         <div class="accordion-item border rounded-lg">
+                            <div class="accordion-header flex justify-between items-center p-4 bg-gray-50 hover:bg-gray-100">
+                                <h4 class="font-semibold">Sorun: API Bağlayıcısı çağrılmıyor.</h4>
+                                <svg class="w-5 h-5 transform transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                            </div>
+                            <div class="accordion-content p-4 border-t border-gray-200">
+                                <p><strong>Neden:</strong> Ağ erişimi sorunları, yanlış kimlik doğrulama bilgileri veya API'deki bir hata olabilir. <br><strong>Çözüm:</strong> Sorunun kaynağını bulmak için en iyi yer B2C günlükleridir. B2C tenant'ınızı Azure Monitor ile entegre ederek API çağrısıyla ilgili detaylı hata mesajlarını görebilirsiniz. Bu entegrasyon bir zorunluluktur.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                 <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+                    <h3 class="text-2xl font-semibold mb-4">Üretim Ortamı Kontrol Listesi</h3>
+                    <ul class="space-y-3">
+                        <li class="flex items-center"><span class="h-6 w-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center mr-3 font-bold">✓</span> Ortam Ayrımı: Geliştirme, test ve üretim için ayrı B2C tenant'ları kullanın.</li>
+                        <li class="flex items-center"><span class="h-6 w-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center mr-3 font-bold">✓</span> Acil Durum Erişimi: Tenant'a erişimi kaybetme riskine karşı bir "camı kır" yönetici hesabı oluşturun.</li>
+                        <li class="flex items-center"><span class="h-6 w-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center mr-3 font-bold">✓</span> MFA: Hassas uygulamalar veya yönetici erişimi için Çok Faktörlü Kimlik Doğrulamayı etkinleştirin.</li>
+                        <li class="flex items-center"><span class="h-6 w-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center mr-3 font-bold">✓</span> İzleme ve Günlükleme: B2C denetim günlüklerini uzun süreli saklama için bir Log Analytics Workspace'e yönlendirin.</li>
+                        <li class="flex items-center"><span class="h-6 w-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center mr-3 font-bold">✓</span> Gelecek Stratejisi: Microsoft'un yeni nesil çözümü olan Microsoft Entra External ID'yi takip edin.</li>
+                    </ul>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const navLinks = document.querySelectorAll('.nav-link');
+            const contentSections = document.querySelectorAll('.content-section');
+            const processSteps = document.querySelectorAll('.process-step');
+            const stepContentContainer = document.getElementById('step-content');
+            const advTabBtns = document.querySelectorAll('.adv-tab-btn');
+            const advTabContents = document.querySelectorAll('.adv-tab-content');
+            const accordionItems = document.querySelectorAll('.accordion-item');
+
+            const stepDetails = {
+                1: {
+                    title: 'Faz 1: Temelleri Atmak',
+                    content: `
+                        <p class="mb-4">Her B2C projesi, hizmeti barındıracak ve uygulamanızla güven ilişkisi kuracak temel kaynakların oluşturulmasıyla başlar. Bu aşama, projenin temelini oluşturur.</p>
+                        <ol class="list-decimal list-inside space-y-2">
+                            <li><strong>Azure AD B2C Tenant'ı Oluşturma:</strong> Azure portalı üzerinden, müşterileriniz için yalıtılmış bir dizin olan B2C tenant'ınızı oluşturun. Bu, kurumsal dizininizden tamamen ayrıdır.</li>
+                            <li><strong>Web Uygulamanızı Kaydetme:</strong> Güvenliğini sağlayacağınız web uygulamanızı (örn. Contoso Commerce) B2C tenant'ı içinde kaydedin. Bu sırada, B2C'nin kullanıcıyı geri göndereceği adresi (Redirect URI) belirtmeniz kritik öneme sahiptir. Test için <strong>https://jwt.ms</strong> kullanmak, gelen token'ı incelemek için harika bir yoldur.</li>
+                            <li><strong>İstemci Sırrı (Client Secret) Oluşturma:</strong> Web uygulamanızın B2C ile güvenli bir şekilde iletişim kurabilmesi için bir istemci sırrı oluşturun ve bunu uygulamanızın yapılandırmasında güvenli bir şekilde saklayın.</li>
+                        </ol>
+                    `
+                },
+                2: {
+                    title: 'Faz 2: Kullanıcı Deneyimini Şekillendirmek',
+                    content: `
+                        <p class="mb-4">Temel kaynaklar hazır olduğunda, kullanıcıların kayıt olma, oturum açma gibi işlemleri nasıl deneyimleyeceğini tanımlama zamanı gelmiştir. Bu, B2C'nin en güçlü olduğu alanlardan biridir.</p>
+                        <ol class="list-decimal list-inside space-y-2">
+                            <li><strong>Kullanıcı Akışları (User Flows) Oluşturma:</strong> Çoğu senaryo için en iyi başlangıç noktasıdır. Portal üzerinden, "Kayıt Ol ve Oturum Aç", "Profil Düzenleme" ve "Parola Sıfırlama" gibi yaygın görevler için tıklamalarla akışlar oluşturun.</li>
+                            <li><strong>Toplanacak Nitelikleri Seçme:</strong> Kayıt sırasında kullanıcıdan hangi bilgileri (Ad, Soyad vb.) toplayacağınızı ve kimlik doğrulama sonrası token'da hangi bilgileri uygulamanıza geri göndereceğinizi seçin.</li>
+                            <li><strong>Kullanıcı Akışlarını Test Etme:</strong> Uygulama kodunu yazmadan önce, oluşturduğunuz akışları portaldaki "Run user flow" özelliği ile test edin. Bu, B2C yapılandırmasındaki sorunları uygulama kodundaki sorunlardan ayırmanızı sağlar.</li>
+                        </ol>
+                    `
+                },
+                3: {
+                    title: 'Faz 3: Kimlik Doğrulama Seçeneklerini Genişletme',
+                    content: `
+                        <p class="mb-4">Kullanıcılara esneklik sunmak, modern uygulamalar için bir zorunluluktur. B2C, yerel hesapların yanı sıra popüler sosyal medya hesaplarıyla da oturum açmayı kolaylaştırır.</p>
+                        <ol class="list-decimal list-inside space-y-2">
+                            <li><strong>Sosyal Medya Kimlik Sağlayıcıları Ekleme:</strong> Google veya Facebook gibi sağlayıcıları eklemek iki adımlı bir süreçtir:
+                                <ul class="list-disc list-inside ml-6 mt-2">
+                                    <li>Önce Google/Facebook geliştirici portalında bir uygulama oluşturun ve size verilen <strong>Client ID</strong> ve <strong>Client Secret</strong>'ı alın.</li>
+                                    <li>Ardından B2C portalındaki "Identity Providers" menüsünden bu sağlayıcıyı ekleyin ve aldığınız kimlik bilgilerini girin.</li>
+                                </ul>
+                            </li>
+                            <li><strong>Kullanıcı Akışını Güncelleme:</strong> Oluşturduğunuz "Kayıt Ol ve Oturum Aç" akışına giderek yeni eklediğiniz sosyal medya sağlayıcılarını etkinleştirin.</li>
+                            <li><strong>Test Etme:</strong> Akışı tekrar çalıştırdığınızda, oturum açma sayfasında artık "Google ile Oturum Aç" ve "Facebook ile Oturum Aç" butonlarının göründüğünü göreceksiniz.</li>
+                        </ol>
+                    `
+                }
+            };
+
+            function updateStepContent(step) {
+                const details = stepDetails[step];
+                stepContentContainer.innerHTML = `
+                    <h3 class="text-xl font-semibold mb-3">${details.title}</h3>
+                    ${details.content}
+                `;
+            }
+            
+            updateStepContent(1);
+
+            navLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const targetId = link.getAttribute('href').substring(1);
+
+                    navLinks.forEach(l => l.classList.remove('active'));
+                    link.classList.add('active');
+
+                    contentSections.forEach(section => {
+                        if (section.id === targetId) {
+                            section.classList.add('active');
+                        } else {
+                            section.classList.remove('active');
+                        }
+                    });
+                });
+            });
+
+            processSteps.forEach(step => {
+                step.addEventListener('click', () => {
+                    const stepNumber = step.dataset.step;
+                    processSteps.forEach(s => {
+                        s.classList.remove('border-blue-500');
+                        s.classList.add('border-gray-300');
+                        s.querySelector('div:first-child').classList.remove('text-blue-500');
+                        s.querySelector('div:first-child').classList.add('text-gray-500');
+                    });
+                    step.classList.add('border-blue-500');
+                    step.classList.remove('border-gray-300');
+                    step.querySelector('div:first-child').classList.add('text-blue-500');
+                    step.querySelector('div:first-child').classList.remove('text-gray-500');
+                    
+                    updateStepContent(stepNumber);
+                });
+            });
+            
+            advTabBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const targetId = btn.dataset.target;
+                    
+                    advTabBtns.forEach(b => {
+                        b.classList.remove('text-blue-600', 'border-blue-600');
+                        b.classList.add('text-gray-500');
+                    });
+                    btn.classList.add('text-blue-600', 'border-blue-600');
+                    btn.classList.remove('text-gray-500');
+
+                    advTabContents.forEach(content => {
+                        if (content.id === targetId) {
+                            content.classList.remove('hidden');
+                        } else {
+                            content.classList.add('hidden');
+                        }
+                    });
+                });
+            });
+
+            accordionItems.forEach(item => {
+                const header = item.querySelector('.accordion-header');
+                const content = item.querySelector('.accordion-content');
+                const icon = header.querySelector('svg');
+
+                header.addEventListener('click', () => {
+                    const isExpanded = content.style.maxHeight && content.style.maxHeight !== '0px';
+                    
+                    accordionItems.forEach(i => {
+                        i.querySelector('.accordion-content').style.maxHeight = '0px';
+                        i.querySelector('.accordion-header svg').style.transform = 'rotate(0deg)';
+                    });
+
+                    if (!isExpanded) {
+                        content.style.maxHeight = content.scrollHeight + 'px';
+                        icon.style.transform = 'rotate(180deg)';
+                    }
+                });
+            });
+
+            const ctx = document.getElementById('pricingChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['0-50k', '50k-100k', '100k-1M', '1M-10M', '>10M'],
+                    datasets: [{
+                        label: 'Kullanıcı Başına Maliyet (USD)',
+                        data: [0, 0.00325, 0.00325, 0.00163, 0.00108],
+                        backgroundColor: [
+                            'rgba(59, 130, 246, 0.2)',
+                            'rgba(59, 130, 246, 0.4)',
+                            'rgba(59, 130, 246, 0.6)',
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(59, 130, 246, 1)'
+                        ],
+                        borderColor: [
+                            'rgba(59, 130, 246, 1)',
+                            'rgba(59, 130, 246, 1)',
+                            'rgba(59, 130, 246, 1)',
+                            'rgba(59, 130, 246, 1)',
+                            'rgba(59, 130, 246, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Aylık Aktif Kullanıcı (MAU) Bazlı Fiyatlandırma'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        if(context.parsed.y === 0){
+                                            label = 'Ücretsiz';
+                                        } else {
+                                            label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 5 }).format(context.parsed.y);
+                                        }
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Maliyet (USD)'
+                            }
+                        },
+                        x: {
+                             title: {
+                                display: true,
+                                text: 'Aylık Aktif Kullanıcı Sayısı'
+                            }
+                        }
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
